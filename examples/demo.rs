@@ -2,18 +2,24 @@
 extern crate log;
 
 use std::cell::RefCell;
-use std::io;
+use std::io::{self, Write};
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::{thread, time};
 
+use crossterm::{
+    event::DisableMouseCapture,
+    event::EnableMouseCapture,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+};
 use log::LevelFilter;
-use termion::event::{self, Key};
-use termion::input::{MouseTerminal, TermRead};
-use termion::raw::IntoRawMode;
-use termion::screen::AlternateScreen;
+// use termion::event::{self, Key};
+// use termion::input::{MouseTerminal, TermRead};
+// use termion::raw::IntoRawMode;
+// use termion::screen::AlternateScreen;
 
-use tui::backend::{Backend, TermionBackend};
+// use tui::backend::{Backend, TermionBackend};
+use tui::backend::{Backend, CrosstermBackend};
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Gauge, Tabs};
@@ -23,14 +29,15 @@ use tui_logger::*;
 
 struct App {
     states: Vec<TuiWidgetState>,
-    dispatcher: Rc<RefCell<Dispatcher<event::Event>>>,
+    dispatcher: Rc<RefCell<Dispatcher<crossterm::event::Event>>>,
     selected_tab: Rc<RefCell<usize>>,
     opt_info_cnt: Option<u16>,
 }
 
 #[derive(Debug)]
 enum AppEvent {
-    Termion(termion::event::Event),
+    // Termion(termion::event::Event),
+    Crossterm(crossterm::event::Event),
     LoopCnt(Option<u16>),
 }
 
@@ -55,22 +62,37 @@ fn main() -> std::result::Result<(), std::io::Error> {
     set_default_level(LevelFilter::Trace);
     info!(target:"DEMO", "Start demo");
 
-    let stdout = io::stdout().into_raw_mode().unwrap();
-    let stdout = MouseTerminal::from(stdout);
-    let stdout = AlternateScreen::from(stdout);
-    let backend = TermionBackend::new(stdout);
+    // let stdout = io::stdout().into_raw_mode().unwrap();
+    // let stdout = MouseTerminal::from(stdout);
+    // let stdout = AlternateScreen::from(stdout);
+    // let backend = TermionBackend::new(stdout);
+
+    crossterm::terminal::enable_raw_mode().unwrap();
+    let mut stdout = io::stdout();
+    crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
+    let backend = CrosstermBackend::new(stdout);
+
     let mut terminal = Terminal::new(backend).unwrap();
-    let stdin = io::stdin();
+    // let stdin = io::stdin();
     terminal.clear().unwrap();
     terminal.hide_cursor().unwrap();
 
     // Use an mpsc::channel to combine stdin events with app events
     let (tx, rx) = mpsc::channel();
     let tx_event = tx.clone();
+    // thread::spawn(move || {
+    //     for c in stdin.events() {
+    //         trace!(target:"DEMO", "Stdin event received {:?}", c);
+    //         tx_event.send(AppEvent::Termion(c.unwrap())).unwrap();
+    //     }
+    // });
     thread::spawn(move || {
-        for c in stdin.events() {
+        while let Ok(c) = crossterm::event::read() {
             trace!(target:"DEMO", "Stdin event received {:?}", c);
-            tx_event.send(AppEvent::Termion(c.unwrap())).unwrap();
+            let res = tx_event.send(AppEvent::Crossterm(c));
+            if res.is_err() {
+                break;
+            }
         }
     });
     thread::spawn(move || {
@@ -79,7 +101,7 @@ fn main() -> std::result::Result<(), std::io::Error> {
 
     let mut app = App {
         states: vec![],
-        dispatcher: Rc::new(RefCell::new(Dispatcher::<event::Event>::new())),
+        dispatcher: Rc::new(RefCell::new(Dispatcher::new())),
         selected_tab: Rc::new(RefCell::new(0)),
         opt_info_cnt: None,
     };
@@ -88,9 +110,22 @@ fn main() -> std::result::Result<(), std::io::Error> {
     for evt in rx {
         trace!(target: "New event", "{:?}",evt);
         match evt {
-            AppEvent::Termion(evt) => {
+            // AppEvent::Termion(evt) => {
+            //     if !app.dispatcher.borrow_mut().dispatch(&evt) {
+            //         if evt == termion::event::Event::Key(event::Key::Char('q')) {
+            //             break;
+            //         }
+            //     }
+            // }
+            AppEvent::Crossterm(evt) => {
                 if !app.dispatcher.borrow_mut().dispatch(&evt) {
-                    if evt == termion::event::Event::Key(event::Key::Char('q')) {
+                    if matches!(
+                        evt,
+                        crossterm::event::Event::Key(crossterm::event::KeyEvent {
+                            code: crossterm::event::KeyCode::Char('q'),
+                            modifiers: _,
+                        })
+                    ) {
                         break;
                     }
                 }
@@ -107,6 +142,9 @@ fn main() -> std::result::Result<(), std::io::Error> {
     terminal.show_cursor().unwrap();
     terminal.clear().unwrap();
 
+    crossterm::execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture).unwrap();
+    crossterm::terminal::disable_raw_mode().unwrap();
+
     Ok(())
 }
 
@@ -121,10 +159,31 @@ fn draw_frame<B: Backend>(t: &mut Frame<B>, size: Rect, app: &mut App) {
     // At least on my computer the 27/91/90 equals a Shift-Tab
     app.dispatcher.borrow_mut().clear();
     app.dispatcher.borrow_mut().add_listener(move |evt| {
-        if &event::Event::Unsupported(vec![27, 91, 90]) == evt {
+        // if &event::Event::Unsupported(vec![27, 91, 90]) == evt {
+        //     *v_sel.borrow_mut() = sel_stab;
+        //     true
+        // } else if &event::Event::Key(Key::Char('\t')) == evt {
+        //     *v_sel.borrow_mut() = sel_tab;
+        //     true
+        // } else {
+        //     false
+        // }
+        if matches!(
+            evt,
+            crossterm::event::Event::Key(crossterm::event::KeyEvent {
+                code: crossterm::event::KeyCode::BackTab,
+                modifiers: _,
+            })
+        ) {
             *v_sel.borrow_mut() = sel_stab;
             true
-        } else if &event::Event::Key(Key::Char('\t')) == evt {
+        } else if matches!(
+            evt,
+            crossterm::event::Event::Key(crossterm::event::KeyEvent {
+                code: crossterm::event::KeyCode::Tab,
+                modifiers: _,
+            })
+        ) {
             *v_sel.borrow_mut() = sel_tab;
             true
         } else {

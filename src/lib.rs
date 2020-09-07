@@ -111,7 +111,6 @@ use std::rc::Rc;
 use chrono::{DateTime, Local};
 use log::{Level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
-use termion::event::*;
 use tui::buffer::Buffer;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Modifier, Style};
@@ -119,6 +118,16 @@ use tui::widgets::{Block, Borders, Widget};
 
 mod circular;
 mod dispatcher;
+
+#[cfg(feature = "tui-termion")]
+#[path = "event/termion_impl.rs"]
+mod event;
+
+#[cfg(feature = "tui-crossterm")]
+#[path = "event/crossterm_impl.rs"]
+mod event;
+
+use crate::event::Event;
 
 pub use crate::circular::CircularBuffer;
 pub use crate::dispatcher::{Dispatcher, EventListener};
@@ -533,7 +542,7 @@ impl<'b> TuiLoggerTargetWidget<'b> {
             let state = self.state.clone();
             if state.borrow().hide_off {
                 dispatcher.borrow_mut().add_listener(move |evt| {
-                    if &Event::Key(Key::Char(' ')) == evt {
+                    if event::is_space_key(evt) {
                         state.borrow_mut().hide_off = false;
                         true
                     } else {
@@ -542,7 +551,7 @@ impl<'b> TuiLoggerTargetWidget<'b> {
                 });
             } else {
                 dispatcher.borrow_mut().add_listener(move |evt| {
-                    if &Event::Key(Key::Char(' ')) == evt {
+                    if event::is_space_key(evt) {
                         state.borrow_mut().hide_off = true;
                         true
                     } else {
@@ -554,7 +563,7 @@ impl<'b> TuiLoggerTargetWidget<'b> {
                 let state = self.state.clone();
                 if self.state.borrow().selected.is_none() {
                     dispatcher.borrow_mut().add_listener(move |evt| {
-                        if &Event::Key(Key::Down) == evt || &Event::Key(Key::Up) == evt {
+                        if event::is_down_key(evt) || event::is_up_key(evt) {
                             state.borrow_mut().selected = Some(0);
                             true
                         } else {
@@ -567,7 +576,7 @@ impl<'b> TuiLoggerTargetWidget<'b> {
                     if selected > 0 {
                         let state = state.clone();
                         dispatcher.borrow_mut().add_listener(move |evt| {
-                            if &Event::Key(Key::Up) == evt {
+                            if event::is_up_key(evt) {
                                 state.borrow_mut().selected = Some(selected - 1);
                                 true
                             } else {
@@ -578,7 +587,7 @@ impl<'b> TuiLoggerTargetWidget<'b> {
                     if selected + 1 < max_selected {
                         let state = self.state.clone();
                         dispatcher.borrow_mut().add_listener(move |evt| {
-                            if &Event::Key(Key::Down) == evt {
+                            if event::is_down_key(evt) {
                                 state.borrow_mut().selected = Some(selected + 1);
                                 true
                             } else {
@@ -598,10 +607,10 @@ impl<'b> TuiLoggerTargetWidget<'b> {
                     };
                     let state = self.state.clone();
                     dispatcher.borrow_mut().add_listener(move |evt| {
-                        if &Event::Key(Key::Left) == evt {
+                        if event::is_left_key(evt) {
                             state.borrow_mut().config.set(&t, less);
                             true
-                        } else if &Event::Key(Key::Right) == evt {
+                        } else if event::is_right_key(evt) {
                             state.borrow_mut().config.set(&t, more);
                             true
                         } else {
@@ -616,10 +625,10 @@ impl<'b> TuiLoggerTargetWidget<'b> {
                             return;
                         };
                     dispatcher.borrow_mut().add_listener(move |evt| {
-                        if &Event::Key(Key::Char('-')) == evt {
+                        if event::is_minus_key(evt) {
                             set_level_for_target(&t, less);
                             true
-                        } else if &Event::Key(Key::Char('+')) == evt {
+                        } else if event::is_plus_key(evt) {
                             set_level_for_target(&t, more);
                             true
                         } else {
@@ -1100,7 +1109,7 @@ impl Widget for TuiLoggerSmartWidget {
             let state = self.state.clone();
             if hide_target {
                 dispatcher.borrow_mut().add_listener(move |evt| {
-                    if &Event::Key(Key::Char('h')) == evt {
+                    if event::is_h_key(evt) {
                         state.borrow_mut().hide_target = false;
                         true
                     } else {
@@ -1109,7 +1118,7 @@ impl Widget for TuiLoggerSmartWidget {
                 });
             } else {
                 dispatcher.borrow_mut().add_listener(move |evt| {
-                    if &Event::Key(Key::Char('h')) == evt {
+                    if event::is_h_key(evt) {
                         state.borrow_mut().hide_target = true;
                         true
                     } else {

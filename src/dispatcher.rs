@@ -71,67 +71,67 @@ pub trait EventListener<E: Debug> {
     fn dispatcher(self, dispatcher: Rc<RefCell<Dispatcher<E>>>) -> Self;
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::Dispatcher;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use termion::event::{Event, Key};
+// #[cfg(test)]
+// mod tests {
+//     use crate::Dispatcher;
+//     use std::cell::RefCell;
+//     use std::rc::Rc;
+//     use termion::event::{Event, Key};
 
-    fn make_queue(dispatcher: &mut Dispatcher<Event>, v: Rc<RefCell<u64>>) {
-        let vx = v.clone();
-        dispatcher.add_listener(move |ev| {
-            if ev == &Event::Key(Key::Left) {
-                *vx.borrow_mut() += 1;
-                true
-            } else {
-                false
-            }
-        });
-        let vx = v.clone();
-        dispatcher.add_listener(move |ev| {
-            if ev == &Event::Key(Key::Left) {
-                *vx.borrow_mut() += 2;
-                true
-            } else {
-                false
-            }
-        });
-        let vx = v.clone();
-        dispatcher.add_listener(move |ev| {
-            if ev == &Event::Key(Key::Down) {
-                *vx.borrow_mut() += 4;
-                true
-            } else {
-                false
-            }
-        });
-    }
+//     fn make_queue(dispatcher: &mut Dispatcher<Event>, v: Rc<RefCell<u64>>) {
+//         let vx = v.clone();
+//         dispatcher.add_listener(move |ev| {
+//             if ev == &Event::Key(Key::Left) {
+//                 *vx.borrow_mut() += 1;
+//                 true
+//             } else {
+//                 false
+//             }
+//         });
+//         let vx = v.clone();
+//         dispatcher.add_listener(move |ev| {
+//             if ev == &Event::Key(Key::Left) {
+//                 *vx.borrow_mut() += 2;
+//                 true
+//             } else {
+//                 false
+//             }
+//         });
+//         let vx = v.clone();
+//         dispatcher.add_listener(move |ev| {
+//             if ev == &Event::Key(Key::Down) {
+//                 *vx.borrow_mut() += 4;
+//                 true
+//             } else {
+//                 false
+//             }
+//         });
+//     }
 
-    #[test]
-    fn test_dispatch() {
-        let v = Rc::new(RefCell::new(0));
+//     #[test]
+//     fn test_dispatch() {
+//         let v = Rc::new(RefCell::new(0));
 
-        let mut dispatcher = crate::Dispatcher::<Event>::new();
-        make_queue(&mut dispatcher, v.clone());
-        assert_eq!(*v.borrow(), 0);
-        let processed = dispatcher.dispatch(&Event::Key(Key::Left));
-        assert_eq!(processed, true);
-        assert_eq!(*v.borrow(), 1);
+//         let mut dispatcher = crate::Dispatcher::<Event>::new();
+//         make_queue(&mut dispatcher, v.clone());
+//         assert_eq!(*v.borrow(), 0);
+//         let processed = dispatcher.dispatch(&Event::Key(Key::Left));
+//         assert_eq!(processed, true);
+//         assert_eq!(*v.borrow(), 1);
 
-        make_queue(&mut dispatcher, v.clone());
-        assert_eq!(*v.borrow(), 1);
-        let processed = dispatcher.dispatch(&Event::Key(Key::Down));
-        assert_eq!(processed, true);
-        assert_eq!(*v.borrow(), 5);
+//         make_queue(&mut dispatcher, v.clone());
+//         assert_eq!(*v.borrow(), 1);
+//         let processed = dispatcher.dispatch(&Event::Key(Key::Down));
+//         assert_eq!(processed, true);
+//         assert_eq!(*v.borrow(), 5);
 
-        make_queue(&mut dispatcher, v.clone());
-        assert_eq!(*v.borrow(), 5);
-        let processed = dispatcher.dispatch(&Event::Key(Key::Up));
-        assert_eq!(processed, false);
-        assert_eq!(*v.borrow(), 5);
-        let processed = dispatcher.dispatch(&Event::Key(Key::Down));
-        assert_eq!(processed, true);
-        assert_eq!(*v.borrow(), 9);
-    }
-}
+//         make_queue(&mut dispatcher, v.clone());
+//         assert_eq!(*v.borrow(), 5);
+//         let processed = dispatcher.dispatch(&Event::Key(Key::Up));
+//         assert_eq!(processed, false);
+//         assert_eq!(*v.borrow(), 5);
+//         let processed = dispatcher.dispatch(&Event::Key(Key::Down));
+//         assert_eq!(processed, true);
+//         assert_eq!(*v.borrow(), 9);
+//     }
+// }
